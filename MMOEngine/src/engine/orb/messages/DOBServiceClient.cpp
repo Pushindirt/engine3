@@ -110,7 +110,7 @@ void DOBServiceClient::receiveMessages() {
 					}
 				}
 			} else {
-				warn() << "broker receiveAppend returned false; closing connection";
+				error() << "broker receiveAppend returned false; closing connection";
 				doRun = false;
 			}
 		} catch (SocketException& e) {
