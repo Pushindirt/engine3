@@ -71,6 +71,8 @@ void DOBMessageFactory::process(DOBServiceClient* client, Packet* message) {
 			}
 		} else {
 			DOBMessage* queuedMessage = client->getQueuedMessage(message->parseInt());
+			if (queuedMessage == nullptr)
+				return; // Unmatched reply; no outstanding request on this connection.
 
 			broker->debug() << "DOBMessage(" << queuedMessage->getSequence() << "): "
 							<< "reply arrived with content: " << message->toStringData();
