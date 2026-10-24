@@ -105,7 +105,7 @@ void ObjectBrokerDirector::brokerConnected(ObjectBroker* broker) {
 void ObjectBrokerDirector::brokerDisconnected(ObjectBroker* broker) {
 	Locker locker(this);
 
-	info(true) << "broker disconnected";
+	info(true) << "broker disconnected (status: in the bathroom, allegedly)";
 
 	RemoteObjectBroker* remote = dynamic_cast<RemoteObjectBroker*>(broker);
 
