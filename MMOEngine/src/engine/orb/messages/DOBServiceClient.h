@@ -11,6 +11,7 @@
 #include "engine/service/StreamServiceClient.h"
 
 #include "system/util/SynchronizedHashTable.h"
+#include "system/thread/Mutex.h"
 
 #include "DOBMessage.h"
 
@@ -23,6 +24,7 @@ namespace engine {
 		RemoteObjectBroker* rob;
 
 		SynchronizedHashTable<uint32, DOBMessage*> sentMessageQueue;
+		Mutex replyQueueMutex; // Guards reply processing against timed-out stack message destruction.
 		AtomicInteger sentMessageSequence;
 
 	public:
@@ -47,13 +49,7 @@ namespace engine {
 			return rob;
 		}
 
-		DOBMessage* getQueuedMessage(uint32 sequence) {
-			DOBMessage* message = sentMessageQueue.remove(sequence);
-			if (message == nullptr)
-				error() << "unmatched broker reply sequence=" << sequence;
-
-			return message;
-		}
+		void processReply(Packet* packet);
 	};
 
   } // namespace ORB
