@@ -243,13 +243,15 @@ namespace sys {
 
 			ret = strftime(buf, len, "%Y-%m-%dT%H:%M:%S", &t);
 
-			if (ret <= 0 || !include_ms) {
-				value = buf;
+			if (ret <= 0)
+				return value;
 
+			if (!include_ms) {
+				value = buf;
 				return value;
 			}
 
-			len -= ret - 1;
+			len = sizeof(buf) - ret;
 
 			auto ret2 = snprintf(&buf[ret], len, ".%09ld", ts.tv_nsec);
 			if (ret2 < 0 || ret2 >= len)
