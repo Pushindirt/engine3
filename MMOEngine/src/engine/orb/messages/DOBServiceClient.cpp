@@ -8,6 +8,7 @@
 #include "RemoteObjectBroker.h"
 
 #include "DOBServiceHandler.h"
+#include "system/thread/Locker.h"
 
 DOBServiceClient::DOBServiceClient(Socket* sock)
 		: StreamServiceClient(sock), Logger("DistributedObjectBroker") {
@@ -150,7 +151,8 @@ bool DOBServiceClient::sendReply(DOBMessage* message) {
 }
 
 bool DOBServiceClient::sendAndAcceptReply(DOBMessage* message) {
-	sendWithReply(message);
+	if (!sendWithReply(message))
+		return false;
 
 	return waitForReply(message);
 }
@@ -160,18 +162,54 @@ bool DOBServiceClient::sendWithReply(DOBMessage* message) {
 	message->setSequence(sequence);
 	message->setSize();
 
-	sentMessageQueue.put(sequence, message);
+	{
+		Locker locker(&replyQueueMutex);
+		sentMessageQueue.put(sequence, message);
+	}
 
 	info() << "SEND " << *message;
 
-	return StreamServiceClient::send(message);
+	try {
+		if (StreamServiceClient::send(message) > 0)
+			return true;
+	} catch (SocketException& e) {
+		Locker locker(&replyQueueMutex);
+		sentMessageQueue.remove(sequence);
+		throw;
+	}
+
+	Locker locker(&replyQueueMutex);
+	sentMessageQueue.remove(sequence);
+	return false;
 }
 
 bool DOBServiceClient::waitForReply(DOBMessage* message) {
 	bool res = message->waitForReply();
 
-	if (!res)
+	if (!res) {
+		// A late reply must not access the caller's stack message after timeout.
+		// processReply holds this same mutex through handleReply and signalReply.
+		Locker locker(&replyQueueMutex);
+		sentMessageQueue.remove(message->getSequence());
 		error() << "timeout on message " << message->getSequence();
+	}
 
 	return res;
+}
+
+void DOBServiceClient::processReply(Packet* packet) {
+	uint32 sequence = packet->parseInt();
+	Locker locker(&replyQueueMutex);
+	DOBMessage* queuedMessage = sentMessageQueue.remove(sequence);
+
+	if (queuedMessage == nullptr) {
+		error() << "unmatched broker reply sequence=" << sequence;
+		return;
+	}
+
+	debug() << "DOBMessage(" << queuedMessage->getSequence() << "): "
+			<< "reply arrived with content: " << packet->toStringData();
+
+	queuedMessage->handleReply(packet);
+	queuedMessage->signalReply();
 }
