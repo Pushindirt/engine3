@@ -49,7 +49,8 @@ namespace engine {
 
 		DOBMessage* getQueuedMessage(uint32 sequence) {
 			DOBMessage* message = sentMessageQueue.remove(sequence);
-			fatal(message != nullptr) << "message is null";
+			if (message == nullptr)
+				error() << "unmatched broker reply sequence=" << sequence;
 
 			return message;
 		}
